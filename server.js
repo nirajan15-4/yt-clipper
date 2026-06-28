@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const YTDlpWrap = require('yt-dlp-wrap').default;
 
 const app = express();
@@ -8,7 +9,19 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
-const ytDlpWrap = new YTDlpWrap();
+// SMART SWITCH: Automatically detects if it's running online (Linux) or local (Windows)
+const isCloud = process.env.PORT || false;
+let ytDlpWrap;
+
+if (isCloud) {
+    // Cloud Render Linux Environment configuration
+    console.log("☁️ Running in Cloud Environment Mode");
+    ytDlpWrap = new YTDlpWrap('/opt/render/project/src/node_modules/yt-dlp-wrap/dist/yt-dlp');
+} else {
+    // Local Windows Desktop configuration
+    console.log("💻 Running in Local Desktop Mode");
+    ytDlpWrap = new YTDlpWrap(path.join(__dirname, 'yt-dlp.exe'));
+}
 
 app.post('/api/clip', async (req, res) => {
     const { url, startTime, endTime } = req.body;
@@ -17,10 +30,11 @@ app.post('/api/clip', async (req, res) => {
     const outputFilename = `clip-${Date.now()}.mp4`;
     const outputPath = path.join(__dirname, 'downloads', outputFilename);
 
-    const fs = require('fs');
-    if (!fs.existsSync(path.join(__dirname, 'downloads'))) fs.mkdirSync(path.join(__dirname, 'downloads'));
+    if (!fs.existsSync(path.join(__dirname, 'downloads'))) {
+        fs.mkdirSync(path.join(__dirname, 'downloads'));
+    }
 
-    console.log(`🌐 Cloud Processing Ready: ${url} [${startTime} - ${endTime}]`);
+    console.log(`🎬 Processing Request: ${url} [${startTime} - ${endTime}]`);
 
     const args = [
         url,
@@ -35,16 +49,16 @@ app.post('/api/clip', async (req, res) => {
         await ytDlpWrap.execPromise(args);
         if (fs.existsSync(outputPath)) {
             res.download(outputPath, outputFilename, (err) => {
-                try { fs.unlinkSync(outputPath); } catch(e){}
+                try { fs.unlinkSync(outputPath); } catch (e) { }
             });
         } else {
-            throw new Error('File validation check failed.');
+            throw new Error('File execution mismatch - output empty.');
         }
     } catch (error) {
-        console.error(error);
+        console.error("Pipeline Error details:", error);
         res.status(500).json({ error: 'Extraction failed.' });
     }
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server listening on port ${PORT}`));
