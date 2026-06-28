@@ -10,50 +10,41 @@ function runMiddleware(req, res, fn) {
     });
 }
 
-// Swapped to standard CommonJS exports so Vercel can run it without syntax crashes
 module.exports = async (req, res) => {
-    if (req.method === 'OPTIONS') {
-        res.status(200).end();
-        return;
-    }
-
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: 'Method Not Allowed' });
-    }
-
     await runMiddleware(req, res, corsMiddleware);
 
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
+
     const { url, startTime, endTime } = req.body;
-    if (!url || !startTime || !endTime) {
-        return res.status(400).json({ error: 'Missing parameters' });
-    }
+    if (!url) return res.status(400).json({ error: 'URL missing' });
 
     try {
+        console.log("Fetching stream for:", url);
+
+        // Use a signal timeout to prevent Vercel from hanging
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+
         const response = await fetch('https://api.cobalt.tools/api/json', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                url: url,
-                vQuality: '720',
-                isAudioOnly: false
-            })
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+            body: JSON.stringify({ url: url, vQuality: '720' }),
+            signal: controller.signal
         });
 
-        const responseData = await response.json();
+        clearTimeout(timeout);
 
-        if (!response.ok || !responseData.url) {
-            return res.status(500).json({ error: 'Stream extraction failed.', details: responseData });
+        const data = await response.json();
+        console.log("API Response Status:", response.status);
+
+        if (!response.ok || !data.url) {
+            return res.status(500).json({ error: 'API Error', details: data });
         }
 
-        return res.status(200).json({
-            success: true,
-            streamUrl: responseData.url
-        });
+        return res.status(200).json({ success: true, streamUrl: data.url });
 
     } catch (err) {
-        return res.status(500).json({ error: 'Serverless execution failure.', details: err.toString() });
+        console.error("Execution Exception:", err.message);
+        return res.status(500).json({ error: 'Server Failure', details: err.message });
     }
 };
