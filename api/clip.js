@@ -10,7 +10,8 @@ function runMiddleware(req, res, fn) {
     });
 }
 
-export default async function handler(req, res) {
+// Swapped to standard CommonJS exports so Vercel can run it without syntax crashes
+module.exports = async (req, res) => {
     if (req.method === 'OPTIONS') {
         res.status(200).end();
         return;
@@ -55,4 +56,4 @@ export default async function handler(req, res) {
     } catch (err) {
         return res.status(500).json({ error: 'Serverless execution failure.', details: err.toString() });
     }
-}
+};
