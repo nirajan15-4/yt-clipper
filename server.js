@@ -13,7 +13,7 @@ app.post('/api/clip', async (req, res) => {
     const { url, startTime, endTime } = req.body;
     if (!url || !startTime || !endTime) return res.status(400).json({ error: 'Missing parameters' });
 
-    console.log(`☁️ Cloud Processing via Cobalt Engine: ${url} [${startTime} - ${endTime}]`);
+    console.log(`🎬 Cloud Request Received: ${url} [${startTime} - ${endTime}]`);
 
     const outputFilename = `clip-${Date.now()}.mp4`;
     const outputPath = path.join(__dirname, 'downloads', outputFilename);
@@ -23,40 +23,54 @@ app.post('/api/clip', async (req, res) => {
     }
 
     try {
-        // Fetch the direct video stream URL using the Cobalt processing API
-        const cobaltApiUrl = 'https://api.cobalt.tools/api/json';
-        const fetchCmd = `curl -X POST -H "Content-Type: application/json" -H "Accept: application/json" -d '{"url":"${url}","vQuality":"720"}' ${cobaltApiUrl}`;
+        // Native secure fetch request to bypass command-line injection/escaping bugs
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                vQuality: '720',
+                isAudioOnly: false
+            })
+        });
 
-        exec(fetchCmd, (error, stdout, stderr) => {
-            if (error) throw new Error('Failed to reach stream broker.');
+        const responseData = await response.json();
 
-            const responseData = JSON.parse(stdout);
-            const directStreamUrl = responseData.url;
+        if (!response.ok || !responseData.url) {
+            console.error("Cobalt API Engine Error response:", responseData);
+            return res.status(500).json({ error: 'Stream extraction failed.', details: responseData });
+        }
 
-            if (!directStreamUrl) throw new Error('YouTube link parsing rejected.');
+        const directStreamUrl = responseData.url;
+        console.log("🔗 Direct stream URL extracted successfully. Commencing FFmpeg slice operation...");
 
-            // Use ffmpeg to cut the clip cleanly from the open network stream
-            const ffmpegCmd = `ffmpeg -ss ${startTime} -to ${endTime} -i "${directStreamUrl}" -c:v libx264 -c:a aac -strict -2 -y ${outputPath}`;
+        // Safely wrap the stream URL in double quotes to prevent shell execution errors
+        const ffmpegCmd = `ffmpeg -ss ${startTime} -to ${endTime} -i "${directStreamUrl}" -c:v libx264 -c:a aac -strict -2 -y "${outputPath}"`;
 
-            exec(ffmpegCmd, (ffError) => {
-                if (ffError) {
-                    console.error("FFmpeg error:", ffError);
-                    return res.status(500).json({ error: 'Slicing failed.' });
-                }
+        exec(ffmpegCmd, (ffError, stdout, stderr) => {
+            if (ffError) {
+                console.error("FFmpeg processing error context:", stderr);
+                return res.status(500).json({ error: 'FFmpeg slicing failed.' });
+            }
 
-                if (fs.existsSync(outputPath)) {
-                    res.download(outputPath, outputFilename, () => {
-                        try { fs.unlinkSync(outputPath); } catch (e) { }
-                    });
-                }
-            });
+            if (fs.existsSync(outputPath)) {
+                console.log("🚀 Slicing operation successful! Transporting file to client...");
+                res.download(outputPath, outputFilename, () => {
+                    try { fs.unlinkSync(outputPath); } catch (e) { }
+                });
+            } else {
+                res.status(500).json({ error: 'File generation mismatch error.' });
+            }
         });
 
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Extraction failed.' });
+        console.error("Server Pipeline Exception:", err);
+        res.status(500).json({ error: 'Server internal extraction failure.', details: err.toString() });
     }
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Production engine online on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Production engine running on port ${PORT}`));
