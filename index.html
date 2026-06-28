@@ -272,22 +272,21 @@
             cutBtn.disabled = true;
 
             try {
-                // Points to the relative server path context safely
+                // Point seamlessly to your new Vercel serverless path
                 const response = await fetch('/api/clip', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ url, startTime, endTime })
                 });
 
-                if (!response.ok) throw new Error('Pipeline rendering error.');
+                const data = await response.json();
+                if (!response.ok || !data.streamUrl) throw new Error('Pipeline rendering error.');
 
-                const blob = await response.blob();
-                preparedBlobUrl = window.URL.createObjectURL(blob);
+                // Directly attach the authorized stream to your download client interface
+                downloadLink.href = data.streamUrl;
+                downloadLink.target = "_blank"; // Opens the clean processing file in a fresh window
 
-                downloadLink.href = preparedBlobUrl;
-                downloadLink.download = `StudioClip_${Date.now()}.mp4`;
-
-                statusPanel.innerText = "🎉 Clip Render Completed Successfully!";
+                statusPanel.innerText = "🎉 Stream Broker Link Generated Successfully!";
                 statusPanel.style.background = '#122b1c';
                 statusPanel.style.color = '#00e676';
 
