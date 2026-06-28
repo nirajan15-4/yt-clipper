@@ -1,23 +1,12 @@
 {
-    "version": 2,
-    "builds": [
+    "rewrites": [
         {
-            "src": "api/clip.js",
-            "use": "@vercel/node"
+            "source": "/api/clip",
+            "destination": "/api/clip.js"
         },
         {
-            "src": "index.html",
-            "use": "@vercel/static"
-        }
-    ],
-    "routes": [
-        {
-            "src": "/api/clip",
-            "dest": "api/clip.js"
-        },
-        {
-            "src": "/(.*)",
-            "dest": "/$1"
+            "source": "/(.*)",
+            "destination": "/$1"
         }
     ]
 }
