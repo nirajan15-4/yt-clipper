@@ -33,25 +33,27 @@ app.post('/api/clip', async (req, res) => {
 
     console.log(`🎬 Processing Request: ${url} [${startTime} - ${endTime}]`);
 
-    // ADDED CLOUD NETWORK BYPASS FLAGS HERE
+    // ARMORED ARGUMENTS TO BYPASS BOT VERIFICATION
     const args = [
         url,
         '--no-cache-dir',
         '--no-check-certificates',
+        '--extractor-args', 'youtube:player-client=android,web', // Fallback to mobile clients
+        '--user-agent', 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36', // Spoof real phone device
         '--external-downloader', 'ffmpeg',
         '--external-downloader-args', `ffmpeg_i:-ss ${startTime} -to ${endTime}`,
         '--force-overwrites',
-        '-f', 'b[ext=mp4]',
+        '-f', 'bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]', // Smarter quality fallback
         '-o', outputPath
     ];
 
     try {
-        // Set a 45-second timeout safeguard so the browser doesn't spin forever
         const downloadPromise = ytDlpWrap.execPromise(args);
 
+        // Extended timeout to 60s for server encoding overhead
         await Promise.race([
             downloadPromise,
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud stream timeout')), 45000))
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Cloud stream timeout')), 60000))
         ]);
 
         if (fs.existsSync(outputPath)) {
