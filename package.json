@@ -1,0 +1,15 @@
+{
+  "name": "yt-clipper",
+  "version": "1.0.0",
+  "description": "YouTube video clipper built for cloud deployment",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "render-build": "npm install && mkdir -p downloads && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o yt-dlp && chmod a+rx yt-dlp && mkdir -p node_modules/yt-dlp-wrap/dist/ && cp yt-dlp node_modules/yt-dlp-wrap/dist/ && ln -s /usr/bin/ffmpeg ."
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "yt-dlp-wrap": "^2.1.1"
+  }
+}
